@@ -1,0 +1,17 @@
+{
+  "id": "msg_01XFDUDYJgAACzvnptvVoYEL",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "This is a successful Claude response with meaningful content that exceeds the minimum length threshold."
+    }
+  ],
+  "model": "claude-sonnet-4-6",
+  "stop_reason": "end_turn",
+  "usage": {
+    "input_tokens": 25,
+    "output_tokens": 20
+  }
+}

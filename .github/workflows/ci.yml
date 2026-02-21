@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify dist files exist
+        run: |
+          test -f dist/prompt-builder.js
+          test -f dist/api-caller.js
+          test -f dist/response-parser.js
+
+      - name: Check dist is up to date
+        run: |
+          git diff --exit-code dist/ || {
+            echo "::error::dist/ is out of date. Run 'npm run build' and commit the changes."
+            exit 1
+          }

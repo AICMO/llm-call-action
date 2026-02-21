@@ -1,0 +1,33 @@
+name: Integration Tests
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * 1' # Weekly on Monday at 6am UTC
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    if: github.repository == 'aicmo/llm-call-action'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          INTEGRATION: 'true'
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+          VERTEX_PROJECT: ${{ secrets.VERTEX_PROJECT }}

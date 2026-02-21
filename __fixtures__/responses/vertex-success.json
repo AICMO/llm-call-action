@@ -1,0 +1,20 @@
+{
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "This is a successful Vertex AI response with meaningful content that exceeds the minimum length threshold."
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP"
+    }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 25,
+    "candidatesTokenCount": 20,
+    "totalTokenCount": 45
+  }
+}

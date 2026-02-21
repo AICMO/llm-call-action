@@ -1,0 +1,123 @@
+name: 'LLM Call'
+description: 'prompt + data → LLM → parsed output. Claude Code OAuth preferred, API fallback for Claude/OpenAI/Gemini/Vertex.'
+
+inputs:
+  prompt:
+    description: 'Inline prompt text (alternative to prompt_file)'
+    default: ''
+  prompt_file:
+    description: 'Path to prompt template file (alternative to prompt)'
+    default: ''
+  data:
+    description: 'Inline data text to append to prompt (alternative to data_file)'
+    default: ''
+  data_file:
+    description: 'Path to data file to append to prompt (alternative to data)'
+    default: ''
+  output_file:
+    description: 'Where to write the parsed LLM response'
+    default: '/tmp/llm_response.txt'
+  claude_code_oauth_token:
+    description: 'Claude Code OAuth token (preferred path — enables claude-code-action)'
+    default: ''
+  provider:
+    description: 'LLM provider for API fallback: claude, openai, gemini, vertex'
+    default: 'claude'
+  model:
+    description: 'Model name (defaults per provider if empty)'
+    default: ''
+  max_tokens:
+    description: 'Max tokens for LLM response'
+    default: '4096'
+  clean_response:
+    description: 'Clean the LLM response: strip code fences, detect error patterns, validate min length'
+    default: 'true'
+  min_response_length:
+    description: 'Minimum response length in characters (only when clean_response is true)'
+    default: '50'
+  anthropic_api_key:
+    description: 'Anthropic API key (for provider: claude)'
+    default: ''
+  openai_api_key:
+    description: 'OpenAI API key (for provider: openai)'
+    default: ''
+  google_api_key:
+    description: 'Google AI API key (for provider: gemini)'
+    default: ''
+  google_application_credentials_json:
+    description: 'Google service account credentials, base64-encoded (for provider: vertex)'
+    default: ''
+  vertex_project:
+    description: 'Google Cloud project for Vertex AI'
+    default: ''
+  vertex_region:
+    description: 'Google Cloud region for Vertex AI'
+    default: 'us-central1'
+  max_turns:
+    description: 'Max turns for Claude Code OAuth path'
+    default: '5'
+
+outputs:
+  response:
+    description: 'The parsed text response from the LLM'
+  response_file:
+    description: 'Path to the file containing the parsed response'
+
+runs:
+  using: composite
+  steps:
+    - name: Build prompt
+      shell: bash
+      run: node ${{ github.action_path }}/dist/prompt-builder.js
+      env:
+        INPUT_PROMPT: ${{ inputs.prompt }}
+        INPUT_PROMPT_FILE: ${{ inputs.prompt_file }}
+        INPUT_DATA: ${{ inputs.data }}
+        INPUT_DATA_FILE: ${{ inputs.data_file }}
+
+    - name: Check auth method
+      id: auth
+      shell: bash
+      run: |
+        if [[ -n "${{ inputs.claude_code_oauth_token }}" ]]; then
+          echo "method=oauth" >> $GITHUB_OUTPUT
+        else
+          echo "method=api" >> $GITHUB_OUTPUT
+        fi
+
+    - name: LLM Call (OAuth Personal Token — preferred)
+      id: llm_oauth
+      if: steps.auth.outputs.method == 'oauth'
+      uses: anthropics/claude-code-action@v1
+      with:
+        claude_code_oauth_token: ${{ inputs.claude_code_oauth_token }}
+        prompt: |
+          Read the file ${{ github.workspace }}/.llm_user_prompt.txt and follow the instructions in it.
+          Respond with ONLY the requested output (no code fences, no explanations).
+        claude_args: |
+          --model ${{ inputs.model || 'claude-sonnet-4-6' }}
+          --max-turns ${{ inputs.max_turns }}
+
+    - name: LLM Call (API fallback)
+      if: steps.auth.outputs.method == 'api'
+      shell: bash
+      run: node ${{ github.action_path }}/dist/api-caller.js
+      env:
+        INPUT_PROVIDER: ${{ inputs.provider }}
+        INPUT_MODEL: ${{ inputs.model }}
+        INPUT_MAX_TOKENS: ${{ inputs.max_tokens }}
+        INPUT_ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+        INPUT_OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        INPUT_GOOGLE_API_KEY: ${{ inputs.google_api_key }}
+        INPUT_GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ inputs.google_application_credentials_json }}
+        INPUT_VERTEX_PROJECT: ${{ inputs.vertex_project }}
+        INPUT_VERTEX_REGION: ${{ inputs.vertex_region }}
+
+    - name: Parse response
+      shell: bash
+      run: node ${{ github.action_path }}/dist/response-parser.js
+      env:
+        INPUT_OUTPUT_FILE: ${{ inputs.output_file }}
+        INPUT_CLEAN_RESPONSE: ${{ inputs.clean_response }}
+        INPUT_MIN_RESPONSE_LENGTH: ${{ inputs.min_response_length }}
+        LLM_RESPONSE_CLAUDE_EXEC_FILE: ${{ steps.llm_oauth.outputs.execution_file }}
