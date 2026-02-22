@@ -1,6 +1,10 @@
 name: 'LLM Call'
 description: 'prompt + data → LLM → parsed output. Claude Code OAuth preferred, API fallback for Claude/OpenAI/Gemini/Vertex.'
 
+branding:
+  icon: 'message-square'
+  color: 'purple'
+
 inputs:
   prompt:
     description: 'Inline prompt text (alternative to prompt_file)'
