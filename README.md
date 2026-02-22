@@ -23,9 +23,8 @@ No API keys, no billing setup, no provider configuration. Just your personal tok
 ### How to get your Claude Code OAuth token
 
 1. Install [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
-2. Run `claude` and complete the OAuth login flow
-3. Find your token in `~/.claude/.credentials.json` — copy the `accessToken` value
-4. Add it as a repository secret: **Settings → Secrets → New repository secret** → name it `CLAUDE_CODE_OAUTH_TOKEN`
+2. Run `claude setup-token` — it will open a browser, authenticate, and print a long-lived token
+3. Copy the token and add it as a repository secret: **Settings → Secrets → New repository secret** → name it `CLAUDE_CODE_OAUTH_TOKEN`
 
 > **Usage policy:** Personal Claude Code tokens are tied to your individual Anthropic account. Anthropic's Terms of Service permit personal use. Business or commercial use may require a separate arrangement — it is your responsibility to ensure compliance with Anthropic's current terms. This project does not grant any license to use Anthropic's services.
 

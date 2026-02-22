@@ -1,5 +1,5 @@
 name: 'LLM Call'
-description: 'prompt + data → LLM → parsed output. Claude Code OAuth preferred, API fallback for Claude/OpenAI/Gemini/Vertex.'
+description: 'prompt + data → LLM → parsed output. Use your personal Claude Code token (recommended) or any API key (Claude/OpenAI/Gemini/Vertex).'
 
 branding:
   icon: 'message-square'
