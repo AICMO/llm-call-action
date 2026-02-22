@@ -4,72 +4,123 @@
 
 A reusable composite GitHub Action that takes a prompt template and data file, calls an LLM, and returns cleaned output. Single bundled TypeScript runtime — no external dependencies at execution time.
 
-## Why LLM Call Action?
-
-Most CI/AI actions are either **vendor-locked agents** that own the whole workflow (PR comments, commits, code review) for a single provider, or **thin API wrappers** that hand you the raw JSON response and leave the rest to you.
-
-This action is neither. It **unifies vendor actions with direct API calls behind one interface**. Pass an OAuth token and you get `claude-code-action` under the hood; pass an API key and you get a direct `fetch` to Claude, OpenAI, Gemini, or Vertex AI. Same inputs, same outputs, no `if/else` routing in your workflow. Switch providers by changing one line — your pipeline doesn't care which path ran.
-
-It's a **composable pipeline primitive** — the `curl` of LLM workflows:
-
-- **You** control the prompt (inline text or template file).
-- **You** control the data (any file piped through `data_file`).
-- **You** decide what to do with the output (write to file, post a comment, feed into the next step).
-
-The action handles the undifferentiated work: provider abstraction, auth, code-fence stripping, error detection, and response validation. You chain the steps.
-
-| | Vendor agents | Generic wrappers | **LLM Call Action** |
-|-|--------------|-----------------|-------------------|
-| Multi-provider | No (1 vendor) | Yes | Yes (4 providers) |
-| OAuth + API unified | No | No | Yes (same interface, auto-routed) |
-| Pipeline-oriented | No | No | Yes (`output_file` → next step's `data_file`) |
-| Output cleaning | No (raw response) | No (raw response) | Yes (code-fence stripping, error detection) |
-| Zero runtime overhead | No (installs deps) | Varies | Yes (single bundled file) |
-| Opinionated about workflow | Yes (PR comments, commits) | No | No — you decide what to do with the output |
-
-**Use vendor agents** when you want an AI that reads your repo, writes code, and posts PR comments. **Use this action** when you want a reliable, provider-agnostic building block that fits into any workflow you design.
-
-## Features
-
-- **4 providers** — Claude, OpenAI, Gemini, Vertex AI
-- **Dual auth** — Claude Code OAuth (preferred) or API key per provider
-- **Inline or file prompts** — pass prompt text directly or reference a template file
-- **Response cleaning** — strips code fences, detects error patterns, validates min length (`clean_response: true` by default, disable with `false` for raw passthrough)
-- **Prompt stats** — logs character/word/line counts for debugging
-
 ## Quick Start
+
+The fastest way to get started — use your personal Claude Code OAuth token:
 
 ```yaml
 - uses: aicmo/llm-call-action@v1
   with:
     prompt_file: prompts/summarize.md
     data_file: /tmp/input-data.txt
-    provider: claude
     claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
 - run: cat /tmp/llm_response.txt
 ```
 
-### With inline prompt
+No API keys, no billing setup, no provider configuration. Just your personal token and a prompt. If the token is unavailable or you need a different provider, the action automatically falls back to a configured API key — just add one as an optional safety net.
 
-```yaml
-- uses: aicmo/llm-call-action@v1
-  with:
-    prompt: "Summarize the following data in 3 bullet points."
-    data_file: /tmp/input-data.txt
-    provider: openai
-    openai_api_key: ${{ secrets.OPENAI_API_KEY }}
-```
+### How to get your Claude Code OAuth token
 
-### With Claude Code OAuth (preferred)
+1. Install [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
+2. Run `claude` and complete the OAuth login flow
+3. Find your token in `~/.claude/.credentials.json` — copy the `accessToken` value
+4. Add it as a repository secret: **Settings → Secrets → New repository secret** → name it `CLAUDE_CODE_OAUTH_TOKEN`
+
+> **Usage policy:** Personal Claude Code tokens are tied to your individual Anthropic account. Anthropic's Terms of Service permit personal use. Business or commercial use may require a separate arrangement — it is your responsibility to ensure compliance with Anthropic's current terms. This project does not grant any license to use Anthropic's services.
+
+## Why this action?
+
+Most CI/AI actions are either **vendor-locked agents** that own the whole workflow (PR comments, commits, code review) for a single provider, or **thin API wrappers** that hand you raw JSON and leave the rest to you.
+
+This action is neither. It's a **composable pipeline primitive** — the `curl` of LLM workflows:
+
+- **You** control the prompt (inline text or template file).
+- **You** control the data (any file piped through `data_file`).
+- **You** decide what to do with the output (write to file, post a comment, feed into the next step).
+
+The action handles the undifferentiated work: provider abstraction, auth routing, code-fence stripping, error detection, and response validation. You chain the steps.
+
+| | Vendor agents | Generic wrappers | **LLM Call Action** |
+|-|--------------|-----------------|-------------------|
+| Multi-provider | No (1 vendor) | Yes | Yes (4 providers) |
+| OAuth + API unified | No | No | Yes (auto-routed) |
+| Pipeline-oriented | No | No | Yes (`output_file` → next step's `data_file`) |
+| Output cleaning | No (raw response) | No (raw response) | Yes (code-fence stripping, error detection) |
+| Zero runtime overhead | No (installs deps) | Varies | Yes (single bundled file) |
+| Opinionated about workflow | Yes (PR comments, commits) | No | No — you decide |
+
+**Use vendor agents** when you want an AI that reads your repo, writes code, and posts PR comments. **Use this action** when you want a reliable, provider-agnostic building block that fits into any workflow you design.
+
+## Authentication
+
+### Personal Claude Code token (recommended)
+
+Pass your personal OAuth token. Under the hood, this delegates to `anthropics/claude-code-action@v1` — same engine that powers Claude Code CLI.
 
 ```yaml
 - uses: aicmo/llm-call-action@v1
   with:
     prompt_file: prompts/summarize.md
     data_file: /tmp/input-data.txt
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+```
+
+This is the preferred path: zero API billing, leverages your existing Claude Pro/Team subscription, and supports multi-turn tool use via `max_turns`.
+
+### API key (fallback)
+
+When no OAuth token is provided, the action falls back to a direct API call via `fetch`. Supports 4 providers — pass the corresponding key:
+
+```yaml
+# Claude (Anthropic API)
+- uses: aicmo/llm-call-action@v1
+  with:
+    prompt: "Summarize the following data."
+    data_file: /tmp/input-data.txt
+    provider: claude
     anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
+
+```yaml
+# OpenAI
+- uses: aicmo/llm-call-action@v1
+  with:
+    prompt: "Summarize the following data."
+    data_file: /tmp/input-data.txt
+    provider: openai
+    openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+```
+
+```yaml
+# Gemini
+- uses: aicmo/llm-call-action@v1
+  with:
+    prompt: "Summarize the following data."
+    data_file: /tmp/input-data.txt
+    provider: gemini
+    google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+```
+
+```yaml
+# Vertex AI
+- uses: aicmo/llm-call-action@v1
+  with:
+    prompt: "Summarize the following data."
+    data_file: /tmp/input-data.txt
+    provider: vertex
+    google_application_credentials_json: ${{ secrets.GOOGLE_CREDENTIALS_B64 }}
+    vertex_project: my-gcp-project
+```
+
+## Features
+
+- **2 auth paths** — Personal Claude Code token (recommended) or API key per provider
+- **4 API providers** — Claude, OpenAI, Gemini, Vertex AI
+- **Inline or file prompts** — pass prompt text directly or reference a template file
+- **Response cleaning** — strips code fences, detects error patterns, validates min length (`clean_response: true` by default, disable with `false` for raw passthrough)
+- **Pipeline-ready** — `output_file` of one step becomes `data_file` of the next
+- **Prompt stats** — logs character/word/line counts for debugging
 
 ## Inputs
 
@@ -80,13 +131,13 @@ The action handles the undifferentiated work: provider abstraction, auth, code-f
 | `data` | No | — | Inline data text to append to prompt |
 | `data_file` | No | — | Path to data file to append to prompt |
 | `output_file` | No | `/tmp/llm_response.txt` | Where to write the parsed LLM response |
-| `provider` | No | `claude` | LLM provider: `claude`, `openai`, `gemini`, `vertex` |
+| `claude_code_oauth_token` | No | — | Personal Claude Code OAuth token (recommended — enables OAuth path) |
+| `max_turns` | No | `5` | Max turns for Claude Code OAuth path |
+| `provider` | No | `claude` | LLM provider for API path: `claude`, `openai`, `gemini`, `vertex` |
 | `model` | No | Per-provider default | Model name (provider-specific) |
 | `max_tokens` | No | `4096` | Max tokens for LLM response |
 | `clean_response` | No | `true` | Clean the response: strip code fences, detect error patterns, validate min length |
 | `min_response_length` | No | `50` | Minimum response length in characters (only when `clean_response` is `true`) |
-| `claude_code_oauth_token` | No | — | Claude Code OAuth token (enables OAuth path) |
-| `max_turns` | No | `5` | Max turns for Claude Code OAuth path |
 | `anthropic_api_key` | No | — | Anthropic API key |
 | `openai_api_key` | No | — | OpenAI API key |
 | `google_api_key` | No | — | Google AI API key (Gemini) |
@@ -98,12 +149,13 @@ The action handles the undifferentiated work: provider abstraction, auth, code-f
 
 ### Default Models
 
-| Provider | Default Model       |
-|----------|---------------------|
-| `claude` | `claude-sonnet-4-6` |
-| `openai` | `gpt-4o`            |
-| `gemini` | `gemini-2.5-pro`    |
-| `vertex` | `gemini-2.5-pro`    |
+| Provider | Default Model |
+|----------|---------------|
+| `claude` (OAuth) | `claude-sonnet-4-6` |
+| `claude` (API) | `claude-sonnet-4-6` |
+| `openai` | `gpt-4o` |
+| `gemini` | `gemini-2.5-pro` |
+| `vertex` | `gemini-2.5-pro` |
 
 ## Outputs
 
@@ -125,8 +177,7 @@ The action handles the undifferentiated work: provider abstraction, auth, code-f
   with:
     prompt_file: prompts/release-notes.md
     data_file: /tmp/git-log.txt
-    provider: claude
-    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
 
 #### Documentation Regen
@@ -138,8 +189,7 @@ The action handles the undifferentiated work: provider abstraction, auth, code-f
   with:
     prompt_file: prompts/generate-docs.md
     data_file: /tmp/api-source.txt
-    provider: openai
-    openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
 
 ### Code Quality
@@ -153,8 +203,7 @@ The action handles the undifferentiated work: provider abstraction, auth, code-f
   with:
     prompt_file: prompts/pr-review.md
     data_file: /tmp/pr-diff.txt
-    provider: claude
-    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
 
 ### Data Transformation
@@ -167,8 +216,7 @@ The action handles the undifferentiated work: provider abstraction, auth, code-f
     prompt_file: prompts/translate-to-es.md
     data_file: locales/en.json
     output_file: locales/es.json
-    provider: gemini
-    google_api_key: ${{ secrets.GOOGLE_API_KEY }}
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 ```
 
 ### Multi-step Pipelines
@@ -181,24 +229,44 @@ The action handles the undifferentiated work: provider abstraction, auth, code-f
     prompt_file: prompts/analyze.md
     data_file: /tmp/raw-data.txt
     output_file: /tmp/analysis.txt
-    provider: claude
-    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
 - uses: aicmo/llm-call-action@v1
   with:
     prompt_file: prompts/summarize.md
     data_file: /tmp/analysis.txt
     output_file: /tmp/summary.txt
-    provider: claude
-    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
 - uses: aicmo/llm-call-action@v1
   with:
     prompt_file: prompts/recommend.md
     data_file: /tmp/summary.txt
     output_file: /tmp/recommendations.txt
-    provider: claude
-    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+```
+
+### Mixed Providers
+
+Nothing stops you from mixing auth paths or providers within the same workflow:
+
+```yaml
+# Step 1: Claude via personal token
+- uses: aicmo/llm-call-action@v1
+  with:
+    prompt_file: prompts/analyze.md
+    data_file: /tmp/raw-data.txt
+    output_file: /tmp/analysis.txt
+    claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+# Step 2: OpenAI via API key
+- uses: aicmo/llm-call-action@v1
+  with:
+    prompt_file: prompts/summarize.md
+    data_file: /tmp/analysis.txt
+    output_file: /tmp/summary.txt
+    provider: openai
+    openai_api_key: ${{ secrets.OPENAI_API_KEY }}
 ```
 
 ## Architecture
@@ -284,14 +352,14 @@ One-liner: if `claude_code_oauth_token` is non-empty, output `method=oauth`; oth
 
 **Runs:** Only when `method == 'oauth'`.
 
-Delegates to the official Claude Code Action. Passes a prompt that tells Claude to read `.llm_user_prompt.txt` and respond with raw output only.
+Delegates to the official Claude Code Action using your personal token. Passes a prompt that tells Claude to read `.llm_user_prompt.txt` and respond with raw output only.
 
 | Parameter | Value |
 |-----------|-------|
 | `claude_code_oauth_token` | From input |
 | `prompt` | "Read .llm_user_prompt.txt, respond with ONLY the output" |
 | `--model` | `inputs.model` or `claude-sonnet-4-6` |
-| `--max-turns` | 5 |
+| `--max-turns` | `inputs.max_turns` or `5` |
 
 **Produces:** `steps.llm_oauth.outputs.execution_file` — a JSON file containing the execution log (array of entries with `type: "result"`).
 
@@ -299,7 +367,7 @@ Delegates to the official Claude Code Action. Passes a prompt that tells Claude 
 
 ---
 
-#### Step 3b — API Fallback (`dist/api-caller.js`)
+#### Step 3b — API Path (`dist/api-caller.js`)
 
 **Runs:** Only when `method == 'api'`.
 
