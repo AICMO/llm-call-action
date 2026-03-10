@@ -60,6 +60,9 @@ inputs:
   max_turns:
     description: 'Max turns for Claude Code OAuth path'
     default: '5'
+  claude_tools:
+    description: 'Restrict available tools for Claude Code OAuth path (e.g., "Read", "Bash,Edit,Read"). Leave empty for all tools.'
+    default: ''
 
 outputs:
   response:
@@ -101,6 +104,7 @@ runs:
         claude_args: |
           --model ${{ inputs.model || 'claude-sonnet-4-6' }}
           --max-turns ${{ inputs.max_turns }}
+          ${{ inputs.claude_tools && format('--tools "{0}"', inputs.claude_tools) || '' }}
 
     - name: LLM Call (API fallback)
       if: steps.auth.outputs.method == 'api'

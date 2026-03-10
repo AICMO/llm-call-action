@@ -117,9 +117,26 @@ When no OAuth token is provided, the action falls back to a direct API call via 
 - **2 auth paths** — Personal Claude Code token (recommended) or API key per provider
 - **4 API providers** — Claude, OpenAI, Gemini, Vertex AI
 - **Inline or file prompts** — pass prompt text directly or reference a template file
-- **Response cleaning** — strips code fences, detects error patterns, validates min length (`clean_response: true` by default, disable with `false` for raw passthrough)
+- **Response cleaning** — automatic output sanitization (see below)
 - **Pipeline-ready** — `output_file` of one step becomes `data_file` of the next
 - **Prompt stats** — logs character/word/line counts for debugging
+
+## Response Cleaning
+
+Enabled by default (`clean_response: true`). Set to `false` for raw passthrough.
+
+When enabled, the action applies three cleaning steps to every LLM response before writing it to `output_file`:
+
+1. **Code-fence stripping** — removes opening (`` ```lang ``) and closing (`` ``` ``) fence lines, so you get plain text instead of a markdown code block.
+2. **Error detection** — scans the response for known failure patterns and **fails the step** if any match:
+   - `I cannot`, `I'm unable to`
+   - `ENOENT`, `No such file`
+   - `error occurred`
+   - `cannot be accessed`
+   - `outside the allowed working directory`
+3. **Minimum length validation** — fails if the cleaned response is shorter than `min_response_length` characters (default: `50`). Catches empty or stub responses.
+
+If any check fails, the action exits with a non-zero code and logs the first 5 lines of the response as a preview.
 
 ## Inputs
 
@@ -132,6 +149,7 @@ When no OAuth token is provided, the action falls back to a direct API call via 
 | `output_file` | No | `/tmp/llm_response.txt` | Where to write the parsed LLM response |
 | `claude_code_oauth_token` | No | — | Personal Claude Code OAuth token (recommended — enables OAuth path) |
 | `max_turns` | No | `5` | Max turns for Claude Code OAuth path |
+| `claude_tools` | No | — | Restrict available tools for Claude Code OAuth path (e.g., `Read`, `Bash,Edit,Read`). Leave empty for all tools. |
 | `provider` | No | `claude` | LLM provider for API path: `claude`, `openai`, `gemini`, `vertex` |
 | `model` | No | Per-provider default | Model name (provider-specific) |
 | `max_tokens` | No | `4096` | Max tokens for LLM response |
@@ -359,6 +377,7 @@ Delegates to the official Claude Code Action using your personal token. Passes a
 | `prompt` | "Read .llm_user_prompt.txt, respond with ONLY the output" |
 | `--model` | `inputs.model` or `claude-sonnet-4-6` |
 | `--max-turns` | `inputs.max_turns` or `5` |
+| `--tools` | `inputs.claude_tools` (omitted if empty — all tools available) |
 
 **Produces:** `steps.llm_oauth.outputs.execution_file` — a JSON file containing the execution log (array of entries with `type: "result"`).
 
