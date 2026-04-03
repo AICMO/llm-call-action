@@ -5,6 +5,11 @@ import { existsSync } from 'node:fs';
 const ERROR_PATTERNS =
   /outside the allowed working directory|cannot be accessed|I cannot|I'm unable to|error occurred|ENOENT|No such file/i;
 
+/** Number of leading lines to check for error patterns. Long content is real output, not an error. */
+const ERROR_CHECK_MAX_LINES = 10;
+/** Content longer than this (chars) skips error-pattern detection entirely. */
+const ERROR_CHECK_MAX_LENGTH = 500;
+
 export function stripCodeFences(content: string): string {
   return content
     .split('\n')
@@ -13,7 +18,13 @@ export function stripCodeFences(content: string): string {
 }
 
 export function detectErrorPatterns(content: string): boolean {
-  return ERROR_PATTERNS.test(content);
+  // Long content is clearly real output — skip error detection
+  if (content.trim().length > ERROR_CHECK_MAX_LENGTH) {
+    return false;
+  }
+  // Only check the first few lines where actual errors would appear
+  const head = content.split('\n').slice(0, ERROR_CHECK_MAX_LINES).join('\n');
+  return ERROR_PATTERNS.test(head);
 }
 
 export function extractClaudeExecContent(raw: string): string {
