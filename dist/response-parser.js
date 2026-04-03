@@ -27278,7 +27278,13 @@ function stripCodeFences(content) {
         .join('\n');
 }
 function detectErrorPatterns(content) {
-    return ERROR_PATTERNS.test(content);
+    // Long content is clearly real output — skip error detection
+    if (content.trim().length > 500) {
+        return false;
+    }
+    // Only check the first few lines where actual errors would appear
+    const head = content.split('\n').slice(0, 10).join('\n');
+    return ERROR_PATTERNS.test(head);
 }
 function extractClaudeExecContent(raw) {
     // Try parsing as JSON array with result entries (claude-code-action format)

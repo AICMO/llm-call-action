@@ -13,7 +13,13 @@ export function stripCodeFences(content: string): string {
 }
 
 export function detectErrorPatterns(content: string): boolean {
-  return ERROR_PATTERNS.test(content);
+  // Long content is clearly real output — skip error detection
+  if (content.trim().length > 500) {
+    return false;
+  }
+  // Only check the first few lines where actual errors would appear
+  const head = content.split('\n').slice(0, 10).join('\n');
+  return ERROR_PATTERNS.test(head);
 }
 
 export function extractClaudeExecContent(raw: string): string {

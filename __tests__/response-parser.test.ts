@@ -83,6 +83,17 @@ describe('detectErrorPatterns', () => {
       ),
     ).toBe(false);
   });
+
+  it('returns false for long content even with error phrases', () => {
+    const longContent = 'An error occurred in the system last week. ' + 'x'.repeat(500);
+    expect(detectErrorPatterns(longContent)).toBe(false);
+  });
+
+  it('returns false when error phrase is after line 10', () => {
+    const lines = Array.from({ length: 12 }, (_, i) => `Line ${i + 1} of normal content`);
+    lines.push('I cannot do this');
+    expect(detectErrorPatterns(lines.join('\n'))).toBe(false);
+  });
 });
 
 describe('extractClaudeExecContent', () => {
